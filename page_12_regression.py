@@ -1,4 +1,5 @@
 # ─────────────────── page_12_regression.py ───────────────────
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -14,6 +15,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 import statsmodels.api as sm
 from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.discrete.discrete_model import Logit
 
 # ──────────────────────────────────────────────────────────────
 
@@ -379,14 +381,19 @@ def train_and_evaluate_model() -> None:
             X, y, test_size=0.3, random_state=42, stratify=stratify_param
         )
         
-        # Train model
+        # Train sklearn model for performance metrics
         with st.spinner("Training logistic regression model..."):
-            model = LogisticRegression(max_iter=1000, random_state=42)
-            model.fit(X_train, y_train)
+            sklearn_model = LogisticRegression(max_iter=1000, random_state=42)
+            sklearn_model.fit(X_train, y_train)
+        
+        # Train statsmodels for p-values
+        with st.spinner("Calculating p-values..."):
+            X_train_const = sm.add_constant(X_train)
+            statsmodels_model = Logit(y_train, X_train_const).fit(disp=0)
         
         # Predictions
-        y_pred = model.predict(X_test)
-        y_prob = model.predict_proba(X_test)[:, 1]
+        y_pred = sklearn_model.predict(X_test)
+        y_prob = sklearn_model.predict_proba(X_test)[:, 1]
         
         # Metrics
         acc = accuracy_score(y_test, y_pred)
@@ -404,15 +411,46 @@ def train_and_evaluate_model() -> None:
         c4.metric("F1-Score", f"{f1:.3f}")
         c5.metric("AUC-ROC", f"{auc:.3f}")
         
-        # Feature importance
-        coef_df = pd.DataFrame({
-            "Variable": X.columns,
-            "Coefficient": model.coef_[0],
-            "Abs_Coefficient": np.abs(model.coef_[0]),
-            "Type": ["Factored" if v in st.session_state.factor_names else "Raw" 
-                    for v in X.columns]
-        }).sort_values("Abs_Coefficient", ascending=False)
+        # Feature importance WITH P-VALUES - Updated section
+        coef_data = []
+        for i, var in enumerate(X.columns):
+            # Get coefficient from sklearn
+            coeff = sklearn_model.coef_[0][i]
+            
+            # Get p-value from statsmodels
+            if var in statsmodels_model.pvalues.index:
+                p_val = statsmodels_model.pvalues[var]
+            else:
+                p_val = np.nan
+            
+            coef_data.append({
+                "Variable": var,
+                "Coefficient": coeff,
+                "Abs_Coefficient": abs(coeff),
+                "P_Value": p_val,
+                "Significance": get_significance_stars(p_val),
+                "Type": "Factored" if var in st.session_state.factor_names else "Raw"
+            })
         
+        coef_df = pd.DataFrame(coef_data).sort_values("Abs_Coefficient", ascending=False)
+        
+        # Display enhanced coefficient table with p-values
+        st.dataframe(
+            coef_df[["Variable", "Coefficient", "P_Value", "Significance", "Type"]].round(4),
+            use_container_width=True,
+            column_config={
+                "Variable": "Variable Name",
+                "Coefficient": st.column_config.NumberColumn("Coefficient", format="%.4f"),
+                "P_Value": st.column_config.NumberColumn("P-Value", format="%.4f"),
+                "Significance": "Sig.",
+                "Type": "Variable Type"
+            }
+        )
+        
+        # Add significance legend
+        st.caption("**Significance codes:** *** p≤0.001, ** p≤0.01, * p≤0.05, . p≤0.10")
+        
+        # Rest of the original visualization code remains unchanged
         fig = px.bar(
             coef_df,
             y="Variable",
@@ -462,14 +500,14 @@ def train_and_evaluate_model() -> None:
         report = classification_report(y_test, y_pred, output_dict=True)
         report_df = pd.DataFrame(report).transpose()
         st.dataframe(report_df.round(3), use_container_width=True)
-
+        
         # ──────────────────────────────────────────────────────────────
-        # ADD THIS SECTION HERE - Store results for Step 13
+        # Store results for Step 13
         # ──────────────────────────────────────────────────────────────
-        st.session_state.regression_model = model
-        st.session_state.last_trained_model = model
+        st.session_state.regression_model = sklearn_model
+        st.session_state.last_trained_model = sklearn_model
         st.session_state.model_results = {
-            'regression_model': model,
+            'regression_model': sklearn_model,
             'selected_features': list(X.columns),
             'X_train': X_train,
             'X_test': X_test,
@@ -482,12 +520,30 @@ def train_and_evaluate_model() -> None:
         }
         
         # Show success message for Step 13 readiness
-        st.success("✅ Model results saved for Step 13 - Final Key Driver Summary")    
+        st.success("✅ Model results saved for Step 13 - Final Key Driver Summary")
         
     except Exception as e:
         st.error(f"❌ Error during model training: {str(e)}")
         st.info("This might be due to data quality issues. Please check your data.")
 
+
+def get_significance_stars(p_value):
+    """Return significance stars based on p-value."""
+    if pd.isna(p_value):
+        return ""
+    elif p_value <= 0.001:
+        return "***"
+    elif p_value <= 0.01:
+        return "**"
+    elif p_value <= 0.05:
+        return "*"
+    elif p_value <= 0.10:
+        return "."
+    else:
+        return ""
+
+
 # ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     show_page()
+
