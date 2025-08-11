@@ -1,4 +1,5 @@
 # ---------------------- page_13_final.py ----------------------
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -61,12 +62,21 @@ def show_page():
     st.plotly_chart(bar_fig, use_container_width=True)
     
     st.subheader("🚀 Waterfall – 'What-if' uplift scenarios")
-    wf_fig = make_waterfall_chart(coef_df, final_vars, y)
+    
+    # NEW: Add dropdown for improvement percentage
+    improvement_percentage = st.selectbox(
+        "Select improvement percentage for scenarios:",
+        options=[2, 5, 10, 15, 20],
+        index=2,  # Default to 10%
+        help="This percentage will be applied to the top drivers in the uplift scenarios"
+    )
+    
+    wf_fig = make_waterfall_chart(coef_df, final_vars, y, improvement_percentage)
     st.plotly_chart(wf_fig, use_container_width=True)
     
     st.caption(
-        "Bar = % contribution when all selected drivers improve by 10 p.p.; "
-        "Waterfall = projected Top-5 and Top-10 uplift vs. current level."
+        f"Bar = % contribution when all selected drivers improve by 10 p.p.; "
+        f"Waterfall = projected Top-5 and Top-10 uplift vs. current level at {improvement_percentage}% improvement."
     )
 
 def check_prerequisites():
@@ -328,8 +338,8 @@ def make_impact_bar(impact_df: pd.DataFrame, picked_vars: list):
         st.error(f"Error creating bar chart: {str(e)}")
         return go.Figure()
 
-def make_waterfall_chart(impact_df: pd.DataFrame, picked_vars: list, y_target):
-    """Build a 3-column waterfall: current level vs +Top5 vs +Top10."""
+def make_waterfall_chart(impact_df: pd.DataFrame, picked_vars: list, y_target, improvement_percentage: int):
+    """Build a 3-column waterfall: current level vs +Top5 vs +Top10 with dynamic improvement percentage."""
     try:
         # Calculate current level
         if hasattr(y_target, 'mean'):
@@ -344,20 +354,20 @@ def make_waterfall_chart(impact_df: pd.DataFrame, picked_vars: list, y_target):
             st.warning("No variables available for waterfall chart.")
             return go.Figure()
         
-        # Calculate impacts for top N
+        # Calculate impacts for top N using dynamic improvement percentage
         impacts = []
         for n in TOP_N_LIST:
             top_n = df.head(n)
             uplift = top_n["Impact_%"].sum() / 100  # Convert % to proportion
-            # Scale the uplift (assuming 10% improvement in drivers leads to this impact)
-            scaled_uplift = uplift * 0.1  # 10% improvement factor
+            # Scale the uplift using the selected improvement percentage
+            scaled_uplift = uplift * (improvement_percentage / 100)  # Dynamic improvement factor
             impacts.append(scaled_uplift)
         
         levels = [current, current + impacts[0], current + impacts[1]]
         labels = [
             "Current Level",
-            f"10% ↑ in Top {TOP_N_LIST[0]}",
-            f"10% ↑ in Top {TOP_N_LIST[1]}"
+            f"{improvement_percentage}% ↑ in Top {TOP_N_LIST[0]}",
+            f"{improvement_percentage}% ↑ in Top {TOP_N_LIST[1]}"
         ]
         
         fig = go.Figure()
@@ -385,7 +395,7 @@ def make_waterfall_chart(impact_df: pd.DataFrame, picked_vars: list, y_target):
             )
         
         fig.update_layout(
-            title="Projected Lift with Driver Optimization",
+            title=f"Projected Lift with Driver Optimization ({improvement_percentage}% Improvement)",
             yaxis_title="Top-2-Box Level (%)",
             xaxis_title="Scenario",
             showlegend=False,
