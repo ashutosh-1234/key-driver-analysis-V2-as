@@ -280,23 +280,32 @@ def map_factors_to_raw_features_from_step10(coef_df: pd.DataFrame) -> pd.DataFra
         return pd.DataFrame()
 
 def make_impact_bar(impact_df: pd.DataFrame, picked_vars: list):
-    """Horizontal bar chart: top drivers ≥ MIN_OTHER_BUCKET plus 'Others'."""
+    """Horizontal bar chart: top drivers ≥ MIN_OTHER_BUCKET plus 'Others' with dynamic normalization."""
     try:
+        # CHANGE 1: Filter by selected variables only
         df = impact_df[impact_df["Variable"].isin(picked_vars)].copy()
         df = df[df["Impact_%"] > 0]  # only positive
-        df = df.sort_values("Impact_%", ascending=False)
         
         if df.empty:
             st.warning("No positive impact variables to display.")
             return go.Figure()
         
-        main = df[df["Impact_%"] >= MIN_OTHER_BUCKET]
-        others = df[df["Impact_%"] < MIN_OTHER_BUCKET]
+        # CHANGE 2: Recalculate normalized percentages based on selected features only
+        selected_total_impact = df["Impact_%"].sum()
+        if selected_total_impact > 0:
+            df["Normalized_Impact_%"] = (df["Impact_%"] / selected_total_impact) * 100
+        else:
+            df["Normalized_Impact_%"] = df["Impact_%"]
+        
+        df = df.sort_values("Normalized_Impact_%", ascending=False)
+        
+        main = df[df["Normalized_Impact_%"] >= MIN_OTHER_BUCKET]
+        others = df[df["Normalized_Impact_%"] < MIN_OTHER_BUCKET]
         
         if not others.empty:
             others_row = pd.DataFrame({
                 "Variable": [f"Others ({len(others)})"],
-                "Impact_%": [others["Impact_%"].sum()]
+                "Normalized_Impact_%": [others["Normalized_Impact_%"].sum()]
             })
             plot_df = pd.concat([main, others_row], ignore_index=True)
         else:
@@ -312,17 +321,17 @@ def make_impact_bar(impact_df: pd.DataFrame, picked_vars: list):
         
         fig = px.bar(
             plot_df,
-            x="Impact_%", y="Variable",
+            x="Normalized_Impact_%", y="Variable",
             orientation="h",
-            text="Impact_%",
+            text="Normalized_Impact_%",
             height=max(400, 40 * len(plot_df)),
             title="Normalized Impact of Selected Drivers"
         )
         
-        # Update colors
+        # CHANGE 3: Update text template to show 2 decimal places instead of 1
         fig.update_traces(
             marker_color=colors,
-            texttemplate="%{text:.1f}%", 
+            texttemplate="%{text:.2f}%",  # Changed from .1f to .2f for one more decimal place
             textposition="outside"
         )
         
