@@ -119,7 +119,7 @@ def analyze_category(category_name, features, data, fa_config):
             st.write(f"- Using manual factor count: {n_factors}")
         else:
             # Find optimal factors
-            coverage_results = determine_optimal_factors(
+            coverage_results = determine_optimal_factors_rotated(
                 prepared_data, 
                 fa_config['coverage_threshold']
             )
@@ -166,6 +166,28 @@ def analyze_category(category_name, features, data, fa_config):
     except Exception as e:
         st.error(f"❌ Error analyzing {category_name}: {str(e)}")
         return {'success': False, 'error': str(e)}
+
+def determine_optimal_factors_rotated(data, coverage_threshold, max_factors=None):
+    """
+    Determine optimal factors using the *rotated* factor analysis logic.
+    """
+    if max_factors is None:
+        max_factors = min(data.shape[1] - 1, 15)
+
+    results = []
+    for n_factors in range(1, max_factors + 1):
+        fa_result = perform_factor_analysis(data, n_factors, rotation='varimax')
+        if not fa_result['success']:
+            continue
+        results.append({
+            'n_factors': n_factors,
+            'cumulative_variance': fa_result['cumulative_variance'],
+            'variance_explained': fa_result['variance_explained']
+        })
+        if fa_result['cumulative_variance'] >= coverage_threshold:
+            break  # stop early if coverage threshold met
+
+    return results
 
 def display_execution_summary(fa_results):
     """Display comprehensive execution summary"""
