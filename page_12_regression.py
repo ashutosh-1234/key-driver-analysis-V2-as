@@ -234,35 +234,30 @@ def build_safe_X() -> pd.DataFrame:
         return pd.DataFrame()
 
 
-def get_aligned_X_y() -> tuple[pd.DataFrame, pd.Series]:
-    """Get X and y with guaranteed matching indices and no missing values."""
-    try:
-        X = build_safe_X()
-        y = st.session_state.y_target.copy().reset_index(drop=True)
-        
-        if X.empty:
-            return X, pd.Series(dtype=float)
-        
-        # Ensure same length
-        min_len = min(len(X), len(y))
-        X = X.iloc[:min_len]
-        y = y.iloc[:min_len]
-        
-        # Combine and drop any remaining NAs
-        combined = pd.concat([X, y], axis=1)
-        combined_clean = combined.dropna()
-        
-        if len(combined_clean) == 0:
-            return pd.DataFrame(), pd.Series(dtype=float)
-        
-        X_clean = combined_clean.iloc[:, :-1]
-        y_clean = combined_clean.iloc[:, -1]
-        
-        return X_clean, y_clean
-        
-    except Exception as e:
-        st.error(f"Error aligning X and y: {str(e)}")
+def get_aligned_X_y():
+    X = build_safe_X()
+    y = st.session_state.y_target.copy().reset_index(drop=True)
+
+    if X.empty or y.empty:
         return pd.DataFrame(), pd.Series(dtype=float)
+
+    X = X.reset_index(drop=True)
+    y = y.reset_index(drop=True)
+
+    # align by position (assumes both refer to same sample order)
+    min_len = min(len(X), len(y))
+    X = X.iloc[:min_len]
+    y = y.iloc[:min_len]
+
+    combined = pd.concat([X, y.rename('_target')], axis=1)
+    combined_clean = combined.dropna()
+    if combined_clean.empty:
+        return pd.DataFrame(), pd.Series(dtype=float)
+
+    X_clean = combined_clean.drop(columns=['_target'])
+    y_clean = combined_clean['_target']
+
+    return X_clean, y_clean
 
 
 # ───────────────────────── correlation matrix ─────────────────────────
