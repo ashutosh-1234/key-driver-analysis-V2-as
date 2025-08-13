@@ -44,7 +44,7 @@ def render_feature_prep_page():
         with col1:
             st.metric("Target Variable", selected_target_name)
         with col2:
-            st.metric("Positive Rate", f"{positive_pct:.1f}%")
+            st.metric("T2B %", f"{positive_pct:.1f}%")
         with col3:
             st.metric("Sample Size", f"{total:,}")
 
