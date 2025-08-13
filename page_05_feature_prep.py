@@ -299,4 +299,3 @@ def _display_feature_categories():
 # ──────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     render_feature_prep_page()
-
