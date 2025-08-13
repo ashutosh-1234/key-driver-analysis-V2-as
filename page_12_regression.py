@@ -50,7 +50,12 @@ def show_page() -> None:
     if st.button("Show Correlation Matrix"):
         display_correlation_matrix()
 
-    # 6 ▸ model training
+    # 6 ▸ NEW: Data download for diagnosis
+    st.subheader("📥 Download Regression Data (For Diagnosis)")
+    if st.button("Download Regression Dataset", type="secondary"):
+        download_regression_data()
+
+    # 7 ▸ model training
     st.subheader("🚀 Model Training & Evaluation")
     if st.button("Train Logistic Regression Model", type="primary"):
         train_and_evaluate_model()
@@ -237,27 +242,160 @@ def build_safe_X() -> pd.DataFrame:
 def get_aligned_X_y():
     X = build_safe_X()
     y = st.session_state.y_target.copy().reset_index(drop=True)
-
+    
     if X.empty or y.empty:
         return pd.DataFrame(), pd.Series(dtype=float)
-
+    
     X = X.reset_index(drop=True)
     y = y.reset_index(drop=True)
-
+    
     # align by position (assumes both refer to same sample order)
     min_len = min(len(X), len(y))
     X = X.iloc[:min_len]
     y = y.iloc[:min_len]
-
+    
     combined = pd.concat([X, y.rename('_target')], axis=1)
     combined_clean = combined.dropna()
+    
     if combined_clean.empty:
         return pd.DataFrame(), pd.Series(dtype=float)
-
+    
     X_clean = combined_clean.drop(columns=['_target'])
     y_clean = combined_clean['_target']
-
+    
     return X_clean, y_clean
+
+
+# ──────────────────────────────────────────────────────────────
+# NEW: Data download function for diagnosis
+# ──────────────────────────────────────────────────────────────
+def download_regression_data() -> None:
+    """Download the exact data that goes into regression for diagnosis."""
+    try:
+        st.write("**📊 Regression Data Analysis & Download**")
+        
+        # Get the data that would go into regression
+        X_raw = build_safe_X()
+        y_raw = st.session_state.y_target.copy().reset_index(drop=True)
+        
+        # Show initial data info
+        st.write("**Initial Data Summary:**")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("X Shape", f"{X_raw.shape[0]} × {X_raw.shape[1]}")
+        col2.metric("y Shape", f"{len(y_raw)}")
+        col3.metric("Selected Variables", len(st.session_state.sel_factored) + len(st.session_state.sel_raw))
+        
+        # Show variable breakdown
+        st.write("**Variable Breakdown:**")
+        st.write(f"- Factored variables: {len(st.session_state.sel_factored)} → {st.session_state.sel_factored}")
+        st.write(f"- Raw variables: {len(st.session_state.sel_raw)} → {st.session_state.sel_raw}")
+        
+        if X_raw.empty:
+            st.error("❌ No data available - X matrix is empty")
+            return
+        
+        if y_raw.empty:
+            st.error("❌ No data available - y vector is empty")
+            return
+        
+        # Check for missing values
+        st.write("**Missing Values Analysis:**")
+        missing_X = X_raw.isnull().sum()
+        missing_y = y_raw.isnull().sum()
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.write("**Missing in X variables:**")
+            if missing_X.sum() > 0:
+                st.write(missing_X[missing_X > 0])
+            else:
+                st.write("No missing values in X")
+        
+        with col2:
+            st.write("**Missing in y variable:**")
+            st.write(f"Missing y values: {missing_y}")
+        
+        # Get cleaned data (same process as model training)
+        X_clean, y_clean = get_aligned_X_y()
+        
+        st.write("**After Data Cleaning:**")
+        if X_clean.empty or len(y_clean) == 0:
+            st.error("❌ No data remains after cleaning!")
+            st.write("**Possible reasons:**")
+            st.write("- Too many missing values causing all rows to be dropped")
+            st.write("- Index alignment issues between factor scores and raw variables")
+            st.write("- Data type incompatibilities")
+        else:
+            col1, col2 = st.columns(2)
+            col1.metric("Clean X Shape", f"{X_clean.shape[0]} × {X_clean.shape[1]}")
+            col2.metric("Clean y Shape", f"{len(y_clean)}")
+            
+            # Show target variable distribution
+            st.write("**Target Variable Distribution:**")
+            target_dist = y_clean.value_counts().sort_index()
+            st.write(target_dist)
+            
+            if len(target_dist) < 2:
+                st.warning("⚠️ Target variable has only one class - cannot perform classification")
+            elif target_dist.min() < 2:
+                st.warning(f"⚠️ Smallest class has only {target_dist.min()} samples")
+        
+        # Prepare download data
+        if not X_clean.empty and len(y_clean) > 0:
+            # Combine X and y for download
+            download_df = X_clean.copy()
+            download_df['TARGET_VARIABLE'] = y_clean.values
+            
+            # Create CSV download
+            csv = download_df.to_csv(index=False)
+            
+            st.download_button(
+                label="📥 Download Regression Dataset (CSV)",
+                data=csv,
+                file_name=f"regression_data_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                help="Download the exact dataset that would be used for regression modeling"
+            )
+            
+            # Show data preview
+            with st.expander("👁️ Preview Regression Data"):
+                st.write(f"**Dataset Shape:** {download_df.shape[0]} rows × {download_df.shape[1]} columns")
+                st.dataframe(download_df.head(10), use_container_width=True)
+                
+                # Show data types
+                st.write("**Data Types:**")
+                st.write(download_df.dtypes)
+        
+        else:
+            st.error("❌ Cannot create download - no valid data available")
+            
+            # Create diagnostic download with raw data
+            diagnostic_data = {
+                'Factor_Variables_Selected': st.session_state.sel_factored,
+                'Raw_Variables_Selected': st.session_state.sel_raw,
+                'Factor_Scores_Shape': str(st.session_state.X_factors.shape),
+                'Model_DF_Shape': str(st.session_state.model_df_full.shape),
+                'Target_Shape': str(y_raw.shape),
+                'Missing_Values_X': str(missing_X.sum()),
+                'Missing_Values_y': str(missing_y)
+            }
+            
+            # Convert to DataFrame for download
+            diagnostic_df = pd.DataFrame([diagnostic_data])
+            diagnostic_csv = diagnostic_df.to_csv(index=False)
+            
+            st.download_button(
+                label="📥 Download Diagnostic Info (CSV)",
+                data=diagnostic_csv,
+                file_name=f"regression_diagnostic_{pd.Timestamp.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                mime="text/csv",
+                help="Download diagnostic information about data availability issues"
+            )
+    
+    except Exception as e:
+        st.error(f"❌ Error in data download: {str(e)}")
+        import traceback
+        st.write(f"**Full Error:** {traceback.format_exc()}")
 
 
 # ───────────────────────── correlation matrix ─────────────────────────
@@ -541,4 +679,3 @@ def get_significance_stars(p_value):
 # ──────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     show_page()
-
