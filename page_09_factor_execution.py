@@ -303,15 +303,12 @@ def perform_factor_analysis(data, n_factors, rotation='varimax'):
         )
         
         # Step 6: Calculate variance explained - PROPER FACTOR ANALYSIS METHOD
-        # Variance explained = sum of squared loadings per factor
-        variance_explained = np.sum(final_loadings**2, axis=0)  # Sum of squared loadings
-        
-        # Total possible variance (for standardized data)
-        total_variance = final_loadings.shape[0]  # Number of original variables
-        
-        # Calculate proper ratios
-        variance_ratios = variance_explained / total_variance
-        cumulative_variance = variance_ratios.sum()
+        # After getting final_loadings, use eigenvalues instead
+        correlation_matrix = np.corrcoef(data.values.T)
+        eigenvalues = np.linalg.eigvals(correlation_matrix)
+        eigenvalues = np.sort(eigenvalues)[::-1]  # Sort descending
+        variance_explained = eigenvalues[:n_factors]
+        cumulative_variance = variance_explained.sum() / len(data.columns)
         
         # Verification
         max_correlation = np.abs(np.corrcoef(final_scores.T)[np.triu_indices(n_factors, k=1)]).max()
