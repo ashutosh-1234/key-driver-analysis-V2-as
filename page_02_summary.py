@@ -101,7 +101,11 @@ def generate_visualizations(filtered_df, outcomes, rep_attributes, perceptions,
                             x=clean_data,
                             nbins=7,
                             title=f"Distribution: {outcome}",
-                            color_discrete_sequence=['skyblue']
+                            color_discrete_sequence=['skyblue'],
+                            labels={
+                            'x': 'Distribution',  # x-axis label
+                            'y': 'Count'    # y-axis label
+                            }
                         )
                         fig.add_vline(x=clean_data.mean(), line_dash="dash", line_color="red",
                                     annotation_text=f"Mean: {clean_data.mean():.2f}")
