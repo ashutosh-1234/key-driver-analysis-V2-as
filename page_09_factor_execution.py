@@ -304,9 +304,14 @@ def perform_factor_analysis(data, n_factors, rotation='varimax'):
         
         # Step 6: Calculate variance explained
         variance_explained = np.var(final_scores, axis=0)
-        total_variance = np.var(data.values, axis=0).sum()
+        if hasattr(data, 'columns'):
+            total_variance = len(data.columns)
+        else:
+            total_variance = data.shape[1]
+        
+        # Use consistent calculation
         variance_ratios = variance_explained / total_variance
-        cumulative_variance = np.sum(variance_explained) / len(data.columns)
+        cumulative_variance = variance_ratios.sum()  # Use the ratios, not raw variance!
         
         # Verification
         max_correlation = np.abs(np.corrcoef(final_scores.T)[np.triu_indices(n_factors, k=1)]).max()
