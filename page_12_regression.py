@@ -50,7 +50,7 @@ def show_page() -> None:
     if st.button("Show Correlation Matrix"):
         display_correlation_matrix()
 
-    # 6 ▸ NEW: Data download for diagnosis
+    # 6 ▸ NEW: Data download for diagnosis - THIS WAS MISSING IN YOUR CODE
     st.subheader("📥 Download Regression Data (For Diagnosis)")
     if st.button("Download Regression Dataset", type="secondary"):
         download_regression_data()
@@ -267,7 +267,7 @@ def get_aligned_X_y():
 
 
 # ──────────────────────────────────────────────────────────────
-# NEW: Data download function for diagnosis
+# NEW: Data download function for diagnosis - THIS WAS COMPLETELY MISSING
 # ──────────────────────────────────────────────────────────────
 def download_regression_data() -> None:
     """Download the exact data that goes into regression for diagnosis."""
@@ -371,8 +371,8 @@ def download_regression_data() -> None:
             
             # Create diagnostic download with raw data
             diagnostic_data = {
-                'Factor_Variables_Selected': st.session_state.sel_factored,
-                'Raw_Variables_Selected': st.session_state.sel_raw,
+                'Factor_Variables_Selected': str(st.session_state.sel_factored),
+                'Raw_Variables_Selected': str(st.session_state.sel_raw),
                 'Factor_Scores_Shape': str(st.session_state.X_factors.shape),
                 'Model_DF_Shape': str(st.session_state.model_df_full.shape),
                 'Target_Shape': str(y_raw.shape),
