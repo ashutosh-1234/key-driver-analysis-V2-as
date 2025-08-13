@@ -391,3 +391,4 @@ def ensure_orthogonality(scores, loadings, original_data):
 
 if __name__ == "__main__":
     render_factor_execution_page()
+
