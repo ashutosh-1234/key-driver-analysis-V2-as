@@ -325,7 +325,7 @@ def perform_factor_analysis(data, n_factors, rotation='varimax'):
                 columns=[f'Factor_{i+1}' for i in range(n_factors)],
                 index=data.index
             ),
-            'variance_explained': variance_ratios,
+            'variance_explained': variance_explained,
             'cumulative_variance': cumulative_variance,
             'rotation_matrix': rotation_matrix,
             'max_factor_correlation': max_correlation,
