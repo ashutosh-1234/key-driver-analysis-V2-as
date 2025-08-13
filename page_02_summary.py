@@ -155,7 +155,12 @@ def generate_visualizations(filtered_df, outcomes, rep_attributes, perceptions,
         y=list(category_counts.values()),
         title="Feature Count by Category",
         color=list(category_counts.values()),
-        color_continuous_scale='Blues'
+        color_continuous_scale='Blues',
+        labels={
+        'x': 'Category',  # x-axis label
+        'y': 'Count',     # y-axis label
+        'color': 'Count'  # color bar label
+        }
     )
 
     fig.update_layout(height=400)

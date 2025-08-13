@@ -56,9 +56,9 @@ def render_target_selection_page():
                 with col1:
                     st.metric("Total Responses", f"{total:,}")
                 with col2:
-                    st.metric("Positive (1)", f"{positive_count} ({positive_pct:.1f}%)")
+                    st.metric("T2B", f"{positive_count} ({positive_pct:.1f}%)")
                 with col3: 
-                    st.metric("Negative (0)", f"{negative_count} ({100-positive_pct:.1f}%)")
+                    st.metric("Non T2B", f"{negative_count} ({100-positive_pct:.1f}%)")
                 with col4:
                     st.metric("Std Deviation", f"{std_dev:.3f}")
                 
@@ -136,7 +136,7 @@ def render_target_selection_page():
             with col1:
                 st.metric("Selected Target", selected_target_name)
             with col2:
-                st.metric("Positive Rate", f"{positive_pct:.1f}%")
+                st.metric("T2B %", f"{positive_pct:.1f}%")
             with col3:
                 st.metric("Sample Size", f"{total:,}")
         

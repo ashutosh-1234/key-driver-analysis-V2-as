@@ -87,10 +87,10 @@ def apply_binary_conversion(filtered_df, ltip_col, rep_col, percep_col):
             alpha=0.8
         )
         axes[i].set_title(f"Top-2 Box: {title}", fontsize=12, pad=20)
-        axes[i].set_xlabel('Binary Value')
+        axes[i].set_xlabel('T2B Distribution')
         axes[i].set_ylabel('Count')
         axes[i].set_xticks([0, 1])
-        axes[i].set_xticklabels(['0 (≤5)', '1 (>5)'])
+        axes[i].set_xticklabels(['Non T2B', 'T2B (>=5)'])
         for bar in bars:
             count = int(bar.get_height())
             pct   = 100 * count / total if total else 0
@@ -113,12 +113,12 @@ def apply_binary_conversion(filtered_df, ltip_col, rep_col, percep_col):
         total = bin_df[b_col].count()
         summary.append({
             'Variable': title,
-            'Original Column': o_col,
-            'Binary Column': b_col,
-            'Total Count': total,
-            'Negative (0)': vals.get(0, 0),
-            'Positive (1)': vals.get(1, 0),
-            'Positive %': f"{100 * vals.get(1, 0) / total:.1f}%" if total else "0%",
+            'Metric': o_col,
+            'T2B Metric': b_col,
+            'Total Records': total,
+            'Non T2B': vals.get(0, 0),
+            'T2B': vals.get(1, 0),
+            'T2B %': f"{100 * vals.get(1, 0) / total:.1f}%" if total else "0%",
             'Balance Ratio': (
                 f"{min(vals.get(0, 0), vals.get(1, 0)) / max(vals.get(0, 0), vals.get(1, 0)):.2f}"
                 if max(vals.get(0, 0), vals.get(1, 0)) > 0 else "0"
