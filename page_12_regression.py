@@ -18,39 +18,33 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 def show_page() -> None:
     st.header("📈 Step 12 · Logistic Regression Analysis")
 
-    # --------- PREREQUISITES ---------
+    # -- Prerequisites --
     if "factor_scores_df" not in st.session_state or st.session_state.factor_scores_df is None:
         st.error("⚠️ No factor scores available. Please complete factor analysis first.")
         return
     if "selected_target_col" not in st.session_state:
         st.error("⚠️ No target variable selected. Please complete previous steps.")
         return
+    if "analysis_idx" not in st.session_state:
+        st.error("⚠️ No analysis index found. Please redo Step 6 and confirm selection before proceeding.")
+        return
 
-    # --------- STEP: Use analysis mask if available (from Step 6) ---------
-    # If missing, fallback to "all rows", showing a warning
-    n_all = len(st.session_state.model_df)
-    analysis_idx = st.session_state.get("analysis_idx", None)
-    if analysis_idx is not None:
-        mask = analysis_idx
-    else:
-        mask = st.session_state.model_df.index
-        st.warning("⚠️ WARNING: No fixed analysis mask found. Using ALL rows of your dataset for regression. If you expect subsetting (e.g. by brand), please revisit Step 6 to confirm correct filtering.")
-    # Always operate only on these rows:
-    factor_scores_df = st.session_state.factor_scores_df.loc[mask].reset_index(drop=True)
-    model_df = st.session_state.model_df.loc[mask].reset_index(drop=True)
+    # Always reset index and align to analysis_idx ([0, ..., n-1])
+    mask = st.session_state.analysis_idx
+    factor_scores_df = st.session_state.factor_scores_df.reset_index(drop=True).loc[mask].reset_index(drop=True)
+    model_df = st.session_state.model_df.reset_index(drop=True).loc[mask].reset_index(drop=True)
 
-    # --------- State Reset ---------
     feature_list = st.session_state.feature_list
     selected_features = st.session_state.selected_features
     target_col = st.session_state.selected_target_col
 
-    X_factors = factor_scores_df.reset_index(drop=True)
-    y_target = model_df[target_col].reset_index(drop=True)
+    X_factors = factor_scores_df
+    y_target = model_df[target_col]
     raw_features = [f for f in feature_list if f not in selected_features]
-
     current_factor_names = list(X_factors.columns)
     current_raw_features = raw_features
 
+    # Detect structure change
     previous_factor_names = st.session_state.get('_prev_factor_names', [])
     previous_raw_features = st.session_state.get('_prev_raw_features', [])
     factor_structure_changed = (
@@ -75,7 +69,6 @@ def show_page() -> None:
     if 'sel_raw' not in st.session_state:
         st.session_state.sel_raw = []
 
-    # --------- Main UI Steps ---------
     display_data_summary()
 
     st.subheader("🔍 Multicollinearity Check (VIF Analysis)")
@@ -97,7 +90,6 @@ def show_page() -> None:
     if st.button("Train Logistic Regression Model", type="primary"):
         train_and_evaluate_model()
 
-
 def display_data_summary() -> None:
     st.subheader("📊 Dataset Summary")
     c1, c2, c3, c4 = st.columns(4)
@@ -105,7 +97,6 @@ def display_data_summary() -> None:
     c2.metric("Raw Vars", len(st.session_state.raw_features))
     c3.metric("Sample Size", len(st.session_state.X_factors))
     c4.metric("Target Var", st.session_state.selected_target_col)
-
 
 def variable_selection_interface() -> None:
     factor_names = st.session_state.factor_names
@@ -291,7 +282,7 @@ def train_and_evaluate_model() -> None:
         c5.metric("AUC-ROC", f"{auc:.3f}")
         coef_df = pd.DataFrame({
             "Variable": X.columns,
-            "Coefficient": model.coef_,
+            "Coefficient": model.coef_[0],
             "Abs_Coefficient": np.abs(model.coef_),
             "Type": ["Factored" if v in st.session_state.factor_names else "Raw"
                      for v in X.columns]
@@ -343,4 +334,3 @@ def train_and_evaluate_model() -> None:
 
 if __name__ == "__main__":
     show_page()
-
