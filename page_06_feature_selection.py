@@ -219,6 +219,7 @@ def render_feature_selection_page():
                 st.metric("Missing Values", missing_values)
             
             st.info("📌 Feature selection completed! Click 'Next ➡️' to proceed to factor analysis configuration.")
+            st.session_state.analysis_idx = final_model_df.index
     else:
         st.error("❌ Please select at least one feature to continue.")
 
