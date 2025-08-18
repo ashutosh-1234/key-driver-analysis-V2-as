@@ -205,7 +205,7 @@ def variable_selection_interface() -> None:
 
 # ───────────────────────── safe data builders ─────────────────────────
 def build_safe_X() -> pd.DataFrame:
-    """Build X matrix safely, handling any missing columns."""
+    """Build X matrix safely, forcing index alignment."""
     try:
         # Get valid selections only
         valid_factored = [v for v in st.session_state.sel_factored 
@@ -223,14 +223,16 @@ def build_safe_X() -> pd.DataFrame:
         # Add raw variables
         if valid_raw:
             X_raw = st.session_state.model_df[valid_raw].copy()
-            # Fill missing values
             X_raw = X_raw.fillna(X_raw.median())
             X_parts.append(X_raw)
         
-        # Combine all parts
+        # FORCE INDEX ALIGNMENT - Reset all indices to 0,1,2,... before concat
         if X_parts:
-            X = pd.concat(X_parts, axis=1)
-            return X.reset_index(drop=True)
+            for i, part in enumerate(X_parts):
+                X_parts[i] = part.reset_index(drop=True)
+            
+            X = pd.concat(X_parts, axis=1)  # Now safe - all have 0,1,2,... indices
+            return X
         else:
             return pd.DataFrame()
             
