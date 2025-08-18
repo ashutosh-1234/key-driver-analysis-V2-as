@@ -211,7 +211,7 @@ def build_safe_X() -> pd.DataFrame:
         valid_factored = [v for v in st.session_state.sel_factored 
                          if v in st.session_state.X_factors.columns]
         valid_raw = [v for v in st.session_state.sel_raw 
-                    if v in st.session_state.model_df_full.columns]
+                    if v in st.session_state.model_df.columns]
         
         X_parts = []
         
@@ -222,7 +222,7 @@ def build_safe_X() -> pd.DataFrame:
         
         # Add raw variables
         if valid_raw:
-            X_raw = st.session_state.model_df_full[valid_raw].copy()
+            X_raw = st.session_state.model_df[valid_raw].copy()
             # Fill missing values
             X_raw = X_raw.fillna(X_raw.median())
             X_parts.append(X_raw)
