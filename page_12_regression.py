@@ -18,57 +18,28 @@ from statsmodels.stats.outliers_influence import variance_inflation_factor
 def show_page() -> None:
     st.header("📈 Step 12 · Logistic Regression Analysis")
 
-    # --- PREREQUISITES ---
+    # --------- PREREQUISITES ---------
     if "factor_scores_df" not in st.session_state or st.session_state.factor_scores_df is None:
         st.error("⚠️ No factor scores available. Please complete factor analysis first.")
         return
     if "selected_target_col" not in st.session_state:
         st.error("⚠️ No target variable selected. Please complete previous steps.")
         return
-    if "analysis_idx" not in st.session_state or st.session_state.analysis_idx is None:
-        st.error("⚠️ No fixed analysis row mask found. Please make sure brands/data filters were applied before regression steps.")
-        return
 
-    # 1 ▸ Force refresh all data and clear stale selections
-    force_refresh_regression_data()
+    # --------- STEP: Use analysis mask if available (from Step 6) ---------
+    # If missing, fallback to "all rows", showing a warning
+    n_all = len(st.session_state.model_df)
+    analysis_idx = st.session_state.get("analysis_idx", None)
+    if analysis_idx is not None:
+        mask = analysis_idx
+    else:
+        mask = st.session_state.model_df.index
+        st.warning("⚠️ WARNING: No fixed analysis mask found. Using ALL rows of your dataset for regression. If you expect subsetting (e.g. by brand), please revisit Step 6 to confirm correct filtering.")
+    # Always operate only on these rows:
+    factor_scores_df = st.session_state.factor_scores_df.loc[mask].reset_index(drop=True)
+    model_df = st.session_state.model_df.loc[mask].reset_index(drop=True)
 
-    # 2 ▸ Dataset summary
-    display_data_summary()
-
-    # 3 ▸ VIF
-    st.subheader("🔍 Multicollinearity Check (VIF Analysis)")
-    if st.button("Calculate VIF", type="secondary"):
-        calculate_vif_analysis()
-
-    # 4 ▸ Variable selection
-    st.subheader("🎛️ Variable Selection")
-    variable_selection_interface()
-
-    # 5 ▸ Correlation matrix
-    st.subheader("📈 Correlation Matrix (Selected Variables)")
-    if st.button("Show Correlation Matrix"):
-        display_correlation_matrix()
-
-    # 6 ▸ Data download for diagnosis
-    st.subheader("📥 Download Regression Data (For Diagnosis)")
-    if st.button("Download Regression Dataset", type="secondary"):
-        download_regression_data()
-
-    # 7 ▸ Model training
-    st.subheader("🚀 Model Training & Evaluation")
-    if st.button("Train Logistic Regression Model", type="primary"):
-        train_and_evaluate_model()
-
-
-# --- NEW: ALWAYS apply analysis_idx for ALL matrices ---
-
-def force_refresh_regression_data() -> None:
-    # Always use only rows selected for analysis
-    analysis_idx = st.session_state.analysis_idx
-
-    # Subset all data sources along the same row mask
-    factor_scores_df = st.session_state.factor_scores_df.loc[analysis_idx].reset_index(drop=True)
-    model_df = st.session_state.model_df.loc[analysis_idx].reset_index(drop=True)
+    # --------- State Reset ---------
     feature_list = st.session_state.feature_list
     selected_features = st.session_state.selected_features
     target_col = st.session_state.selected_target_col
@@ -88,12 +59,9 @@ def force_refresh_regression_data() -> None:
     )
     if factor_structure_changed:
         st.info("🔄 Factor structure changed - resetting variable selections")
-        if 'sel_factored' in st.session_state:
-            del st.session_state['sel_factored']
-        if 'sel_raw' in st.session_state:
-            del st.session_state['sel_raw']
-        if 'vif_results' in st.session_state:
-            del st.session_state['vif_results']
+        for var in ['sel_factored', 'sel_raw', 'vif_results']:
+            if var in st.session_state:
+                del st.session_state[var]
 
     st.session_state._prev_factor_names = current_factor_names.copy()
     st.session_state._prev_raw_features = current_raw_features.copy()
@@ -102,16 +70,32 @@ def force_refresh_regression_data() -> None:
     st.session_state.factor_names = current_factor_names
     st.session_state.raw_features = current_raw_features
     st.session_state.model_df_full = model_df
-    # Selections (may be reset)
     if 'sel_factored' not in st.session_state:
         st.session_state.sel_factored = current_factor_names.copy()
     if 'sel_raw' not in st.session_state:
         st.session_state.sel_raw = []
-    st.info(
-        f"Factors: {len(current_factor_names)} · "
-        f"Raw pool: {len(current_raw_features)} · "
-        f"Structure changed: {'Yes' if factor_structure_changed else 'No'}"
-    )
+
+    # --------- Main UI Steps ---------
+    display_data_summary()
+
+    st.subheader("🔍 Multicollinearity Check (VIF Analysis)")
+    if st.button("Calculate VIF", type="secondary"):
+        calculate_vif_analysis()
+
+    st.subheader("🎛️ Variable Selection")
+    variable_selection_interface()
+
+    st.subheader("📈 Correlation Matrix (Selected Variables)")
+    if st.button("Show Correlation Matrix"):
+        display_correlation_matrix()
+
+    st.subheader("📥 Download Regression Data (For Diagnosis)")
+    if st.button("Download Regression Dataset", type="secondary"):
+        download_regression_data()
+
+    st.subheader("🚀 Model Training & Evaluation")
+    if st.button("Train Logistic Regression Model", type="primary"):
+        train_and_evaluate_model()
 
 
 def display_data_summary() -> None:
@@ -127,7 +111,6 @@ def variable_selection_interface() -> None:
     factor_names = st.session_state.factor_names
     raw_features = st.session_state.raw_features
     tab_f, tab_r = st.tabs(["🔬 Factored Variables", "📊 Raw Variables"])
-    # Factored
     with tab_f:
         st.write(f"Available factored variables: {len(factor_names)}")
         a, b = st.columns(2)
@@ -168,9 +151,7 @@ def variable_selection_interface() -> None:
         f"{len(st.session_state.sel_raw)} raw = {nsel} total"
     )
 
-# --------- KEY PART: Always align, do not drop rows until after concat ----------
 def build_safe_X() -> pd.DataFrame:
-    # Build X ALWAYS using the exact same (analysis_idx) rows order
     X_parts = []
     valid_factored = [v for v in st.session_state.sel_factored if v in st.session_state.X_factors.columns]
     valid_raw = [v for v in st.session_state.sel_raw if v in st.session_state.model_df_full.columns]
@@ -180,9 +161,7 @@ def build_safe_X() -> pd.DataFrame:
         X_parts.append(st.session_state.model_df_full[valid_raw].copy())
     if not X_parts:
         return pd.DataFrame()
-    # Concatenate columns by position, preserving analysis_idx row order
     X = pd.concat(X_parts, axis=1)
-    # Fix: Do not drop rows yet; fill missing only for numerical columns if desired
     for col in X.select_dtypes(include=np.number).columns:
         X[col] = X[col].fillna(X[col].median())
     return X.reset_index(drop=True)
@@ -190,17 +169,14 @@ def build_safe_X() -> pd.DataFrame:
 def get_aligned_X_y() -> tuple[pd.DataFrame, pd.Series]:
     X = build_safe_X()
     y = st.session_state.y_target.copy().reset_index(drop=True)
-    # Enforce strict length match (should always match due to analysis_idx)
     min_len = min(len(X), len(y))
     X = X.iloc[:min_len, :]
     y = y.iloc[:min_len]
-    # After all NA fills, still drop any row with NA (should be rare):
     mask = X.notnull().all(axis=1) & (~y.isnull())
     X_clean = X.loc[mask].reset_index(drop=True)
     y_clean = y.loc[mask].reset_index(drop=True)
     return X_clean, y_clean
 
-# ----------------- Data download section --------------------
 def download_regression_data() -> None:
     X_raw = build_safe_X()
     y_raw = st.session_state.y_target.copy().reset_index(drop=True)
